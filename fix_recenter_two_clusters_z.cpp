@@ -19,6 +19,7 @@
 #include "fix_recenter_two_clusters_z.h"
 
 #include "atom.h"
+#include "citeme.h"
 #include "comm.h"
 #include "compute.h"
 #include "domain.h"
@@ -38,11 +39,24 @@
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
+static const char cite_fix_recenter_two_clusters_z[] =
+    "fix recenter/two_clusters/z command: doi:10.1038/s42005-026-02903-1\n\n"
+    "@Article{ActiveCondensates2026,\n"
+    " title =   {Self-organization and collective migration of active condensates},\n"
+    " journal = {Communications Physics},\n"
+    " year =    2026,\n"
+    " volume =  9,\n"
+    " pages =   {327},\n"
+    " doi =     {10.1038/s42005-026-02903-1}\n"
+    "}\n\n";
+
 /* ---------------------------------------------------------------------- */
 
 FixRecenterTwoClustersZ::FixRecenterTwoClustersZ(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
+  if (lmp->citeme) lmp->citeme->add(cite_fix_recenter_two_clusters_z);
+
   if (narg < 10)
     utils::missing_cmd_args(FLERR, "fix recenter/two_clusters/z", error);
 

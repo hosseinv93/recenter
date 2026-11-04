@@ -44,6 +44,7 @@
 #include "fix_recenter_cluster.h"
 
 #include "atom.h"
+#include "citeme.h"
 #include "comm.h"
 #include "compute.h"
 #include "domain.h"
@@ -63,11 +64,24 @@
 using namespace LAMMPS_NS;
 using namespace FixConst;
 
+static const char cite_fix_recenter_cluster[] =
+    "fix recenter/cluster command: doi:10.1038/s42005-026-02903-1\n\n"
+    "@Article{ActiveCondensates2026,\n"
+    " title =   {Self-organization and collective migration of active condensates},\n"
+    " journal = {Communications Physics},\n"
+    " year =    2026,\n"
+    " volume =  9,\n"
+    " pages =   {327},\n"
+    " doi =     {10.1038/s42005-026-02903-1}\n"
+    "}\n\n";
+
 /* ---------------------------------------------------------------------- */
 
 FixRecenterCluster::FixRecenterCluster(LAMMPS *lmp, int narg, char **arg) :
   Fix(lmp, narg, arg)
 {
+  if (lmp->citeme) lmp->citeme->add(cite_fix_recenter_cluster);
+
   if (narg < 7) utils::missing_cmd_args(FLERR, "fix recenter/cluster", error);
 
   xcom = ycom = zcom = 0.0;

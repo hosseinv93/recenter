@@ -11,6 +11,8 @@ They work like the built-in [`fix recenter`](https://docs.lammps.org/fix_recente
 
 The fixes only shift coordinates. They do not change velocities or forces.
 
+If you use them, please [cite our paper](#how-to-cite).
+
 ## Install
 
 You need the LAMMPS source code and CMake. No extra packages are required.
@@ -119,6 +121,14 @@ Output for `thermo_style` (`f_ID`):
 - The pair cutoff must be at least the `cluster/atom` cutoff.
 - Clusters that cross a periodic boundary are handled correctly.
 - The shifts make unwrapped trajectories jump. Subtract the reported shifts before computing diffusion.
+
+## How to cite
+
+If you use these fixes in your work, please cite this paper:
+
+> Self-organization and collective migration of active condensates. *Communications Physics* **9**, 327 (2026). https://doi.org/10.1038/s42005-026-02903-1
+
+LAMMPS also prints this reference on screen and in `log.cite` when you run a simulation that uses either fix.
 
 ## License
 
