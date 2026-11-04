@@ -1,114 +1,125 @@
-# Cluster recentering fixes for LAMMPS
+# fix recenter/cluster for LAMMPS
 
-Two custom LAMMPS fixes that keep condensates (droplets, slabs, aggregates) at a chosen position in the box. They work like the built-in [`fix recenter`](https://docs.lammps.org/fix_recenter.html), but the reference is the **largest cluster** found by [`compute cluster/atom`](https://docs.lammps.org/compute_cluster_atom.html), not the whole group. Dilute atoms that leave a droplet therefore do not drag its reference point around.
+Two extra [LAMMPS](https://www.lammps.org) fixes that keep a droplet, slab or aggregate at a fixed position in the simulation box.
 
-| Fix style | Files | Purpose |
-|---|---|---|
-| `recenter/cluster` | `fix_recenter_cluster.cpp/.h` | Recenter the single largest cluster |
-| `recenter/two_clusters/z` | `fix_recenter_two_clusters_z.cpp/.h` | Recenter two clusters, one below and one above a z plane, independently |
+They work like the built-in [`fix recenter`](https://docs.lammps.org/fix_recenter.html), with one difference. They follow only the **largest cluster** found by [`compute cluster/atom`](https://docs.lammps.org/compute_cluster_atom.html), so loose atoms in the dilute phase do not pull the reference point around.
 
-Both fixes shift coordinates only. They change no velocities or forces and add no energy.
+| Fix | What it does |
+|---|---|
+| `recenter/cluster` | Keeps the largest cluster at a target position |
+| `recenter/two_clusters/z` | Keeps two clusters, one below and one above a z plane, at two separate targets |
 
-## Installation
+The fixes only shift coordinates. They do not change velocities or forces.
 
-The fixes use only core LAMMPS classes. Copy them into `src/` and rebuild:
+## Install
 
-```bash
-cp fix_recenter_*.cpp fix_recenter_*.h /path/to/lammps/src/
+You need the LAMMPS source code and CMake. No extra packages are required.
 
-cd /path/to/lammps
-cmake -S cmake -B build     # re-run so CMake picks up the new files
-cmake --build build -j
+1. Copy the four files into the LAMMPS `src` folder:
+
+   ```bash
+   cp fix_recenter_*.cpp fix_recenter_*.h /path/to/lammps/src/
+   ```
+
+2. Build LAMMPS as usual. If you already have a build folder, run the first command again so CMake sees the new files:
+
+   ```bash
+   cd /path/to/lammps
+   cmake -S cmake -B build
+   cmake --build build -j 4
+   ```
+
+3. Check that the fixes are included:
+
+   ```bash
+   ./build/lmp -h | grep recenter
+   ```
+
+   You should see `recenter/cluster` and `recenter/two_clusters/z` in the list.
+
+## Quick start
+
+Add these lines to your input script, after your integrator fix (for example `fix nvt`):
+
+```lammps
+compute clus all cluster/atom 1.5
+fix keep all recenter/cluster NULL NULL 0.0 clus shift all minatoms 100
 ```
 
-`compute cluster/atom` is part of core LAMMPS.
+This finds clusters with a cutoff of 1.5. It then moves the whole system every step so that the largest cluster's centre of mass stays at z = 0. Clusters smaller than 100 atoms are ignored.
+
+To hold two condensates at z = -30 and z = +30:
+
+```lammps
+compute clus all cluster/atom 1.5
+fix hold all recenter/two_clusters/z NULL NULL -30.0 NULL NULL 30.0 clus zsplit 0.0 minatoms 100
+```
 
 ## `fix recenter/cluster`
 
 ```
-fix ID group-ID recenter/cluster x y z clusterComputeID keyword value ...
+fix ID group-ID recenter/cluster x y z clusterComputeID [keyword value ...]
 ```
 
-- `x`, `y`, `z`: target position of the cluster's centre of mass. Each is a number, `NULL` (leave this direction alone) or `INIT` (the cluster's centre of mass when the run is set up).
-- `clusterComputeID`: ID of a `compute cluster/atom` (any compute that gives a per-atom cluster ID works).
+- `x y z` is the target position. Each value is a number, `NULL` to leave that direction alone, or `INIT` to use the cluster's starting position.
+- `clusterComputeID` is the ID of a `compute cluster/atom`.
 
 | Keyword | Values | Default | Meaning |
 |---|---|---|---|
-| `units` | `box`, `lattice`, `fraction` | `box` | Units of `x y z`. `fraction` means fractions of the box, re-evaluated every step |
-| `shift` | `cluster`, `all`, or a group ID | `cluster` | Which atoms are moved: only the selected cluster, every atom, or the atoms of that group |
-| `minatoms` | N ≥ 1 | 1 | Ignore clusters with fewer than N atoms. If no cluster qualifies, nothing is moved that step |
-| `nevery` | N ≥ 1 | 1 | Recenter only on steps that are multiples of N |
+| `units` | `box`, `lattice`, `fraction` | `box` | Units of `x y z` |
+| `shift` | `cluster`, `all`, or a group ID | `cluster` | Which atoms are moved |
+| `minatoms` | N | 1 | Ignore clusters smaller than N atoms |
+| `nevery` | N | 1 | Recenter every N steps |
 
-The selected cluster is the one with the most atoms among the atoms in `group-ID`, with ties broken by mass. Its centre of mass is mass-weighted. Along every recentred periodic direction, each atom is taken at the periodic image closest to the target, so a droplet or slab that straddles a boundary is handled correctly. The shift uses the minimum-image convention, and shifted atoms are wrapped back into the box. The fix forces a neighbor-list rebuild on steps where it moves atoms.
+Tip: use `shift all` to move the whole system together. With `shift cluster`, only the cluster moves, which can push it into nearby atoms.
 
-With `shift cluster`, only the cluster moves relative to its surroundings, which can create overlaps with nearby atoms. Use `shift all` to translate the whole system rigidly, like `fix recenter`.
+Output for `thermo_style` (`f_ID`):
 
-**Output** (global, intensive):
-
-| Quantity | Meaning |
+| Value | Meaning |
 |---|---|
-| `f_ID` | Length of the applied shift |
-| `f_ID[1..3]` | Shift vector |
-| `f_ID[4..6]` | Cluster centre of mass before shifting |
-| `f_ID[7]` | Number of atoms in the selected cluster |
-
-All values are 0 on steps without recentering (`nevery`, or no valid cluster).
-
-**Example**: keep a droplet's centre at z = −10 by translating the whole system:
-
-```lammps
-compute clus all cluster/atom 1.5
-fix keep all recenter/cluster NULL NULL -10.0 clus units box shift all minatoms 300
-thermo_style custom step temp pe f_keep f_keep[3] f_keep[7]
-```
+| `f_ID` | Size of the shift |
+| `f_ID[1]` to `f_ID[3]` | Shift in x, y, z |
+| `f_ID[4]` to `f_ID[6]` | Cluster centre of mass before the shift |
+| `f_ID[7]` | Number of atoms in the cluster |
 
 ## `fix recenter/two_clusters/z`
 
 ```
-fix ID group-ID recenter/two_clusters/z xneg yneg zneg xpos ypos zpos clusterComputeID keyword value ...
+fix ID group-ID recenter/two_clusters/z xneg yneg zneg xpos ypos zpos clusterComputeID [keyword value ...]
 ```
 
-- `xneg yneg zneg`: target centre of mass for the cluster below the split plane.
-- `xpos ypos zpos`: target for the cluster above it.
-- The x and y targets may be `NULL`. **Both z targets must be numbers.** `INIT` is not supported.
+- `xneg yneg zneg` is the target for the cluster below `zsplit`.
+- `xpos ypos zpos` is the target for the cluster above `zsplit`.
+- x and y can be `NULL`. Both z values must be numbers.
 
 | Keyword | Values | Default | Meaning |
 |---|---|---|---|
-| `units` | `box`, `lattice`, `fraction` | `box` | Units of the six targets |
-| `zsplit` | z | 0.0 | Plane that separates the two sides |
-| `minatoms` | N ≥ 1 | 1 | Minimum cluster size |
-| `nevery` | N ≥ 1 | 1 | Recenter every N steps |
+| `units` | `box`, `lattice`, `fraction` | `box` | Units of the targets |
+| `zsplit` | z | 0.0 | Plane that separates the two sides. Uses box units, even with `units fraction` |
+| `minatoms` | N | 1 | Ignore clusters smaller than N atoms |
+| `nevery` | N | 1 | Recenter every N steps |
 
-The "negative" cluster is the largest cluster (≥ `minatoms`) with more of its atoms at `z < zsplit` than above, judged from wrapped coordinates. The "positive" cluster is the largest with more atoms at `z ≥ zsplit`, excluding the one already chosen. Each cluster is shifted to its own target. Only the atoms of the two selected clusters (in `group-ID`) are moved.
+Each cluster is moved to its own target. If one cluster is missing, or the two have merged into one, nothing is moved on that step.
 
-**Safety rule:** if either cluster is missing, or if both sides belong to the same merged cluster, the fix moves nothing on that step.
+Output for `thermo_style` (`f_ID`):
 
-`zsplit` is scaled for `units lattice` but **not** for `units fraction`, where it stays in box units.
-
-**Output** (global, intensive):
-
-| Quantity | Meaning |
+| Value | Meaning |
 |---|---|
-| `f_ID` | Combined length of both shift vectors |
-| `f_ID[1..3]`, `f_ID[4..6]` | Shift of the negative and of the positive cluster |
-| `f_ID[7..9]`, `f_ID[10..12]` | Centre of mass of each cluster before shifting |
+| `f_ID` | Total size of both shifts |
+| `f_ID[1]` to `f_ID[3]` | Shift of the lower cluster |
+| `f_ID[4]` to `f_ID[6]` | Shift of the upper cluster |
+| `f_ID[7]` to `f_ID[9]` | Lower cluster centre of mass before the shift |
+| `f_ID[10]` to `f_ID[12]` | Upper cluster centre of mass before the shift |
 | `f_ID[13]`, `f_ID[14]` | Atom count of each cluster |
-| `f_ID[15]`, `f_ID[16]` | Cluster ID of each cluster (0 if none) |
+| `f_ID[15]`, `f_ID[16]` | Cluster ID of each cluster, 0 if none |
 
-**Example**: two condensates held at z = −30 and z = +30 on either side of z = 0:
+## Good to know
 
-```lammps
-compute clus all cluster/atom 1.5
-fix hold all recenter/two_clusters/z NULL NULL -30.0 NULL NULL 30.0 clus zsplit 0.0 minatoms 200
-```
-
-## Usage notes
-
-- Define these fixes **after** the time-integration fixes, as with `fix recenter`. Otherwise the fix prints a warning.
-- `compute cluster/atom` needs a neighbor list whose cutoff covers the clustering distance. A pair cutoff of at least that distance is enough.
-- Recentering is done at the start of each step (`initial_integrate`), and rRESPA runs use the outermost level.
-- Instantaneous shifts make unwrapped trajectories discontinuous. Account for this, for example by subtracting the reported shifts, when computing diffusion or other displacement-based quantities.
+- Define these fixes after your integrator fix, the same as `fix recenter`.
+- The pair cutoff must be at least the `cluster/atom` cutoff.
+- Clusters that cross a periodic boundary are handled correctly.
+- The shifts make unwrapped trajectories jump. Subtract the reported shifts before computing diffusion.
 
 ## License
 
-GNU General Public License v2 or later, the same as LAMMPS.
+GNU General Public License v2 or later, the same as LAMMPS. See [LICENSE](LICENSE).
