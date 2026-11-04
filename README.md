@@ -126,7 +126,7 @@ Output for `thermo_style` (`f_ID`):
 
 If you use these fixes in your work, please cite this paper:
 
-> Self-organization and collective migration of active condensates. *Communications Physics* **9**, 327 (2026). https://doi.org/10.1038/s42005-026-02903-1
+> H. Vahid, J.-U. Sommer, and A. Sharma. Self-organization and collective migration of active condensates. *Communications Physics* **9**, 327 (2026). https://doi.org/10.1038/s42005-026-02903-1
 
 LAMMPS also prints this reference on screen and in `log.cite` when you run a simulation that uses either fix.
 

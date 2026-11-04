@@ -66,7 +66,8 @@ using namespace FixConst;
 
 static const char cite_fix_recenter_cluster[] =
     "fix recenter/cluster command: doi:10.1038/s42005-026-02903-1\n\n"
-    "@Article{ActiveCondensates2026,\n"
+    "@Article{Vahid2026,\n"
+    " author =  {H. Vahid and J.-U. Sommer and A. Sharma},\n"
     " title =   {Self-organization and collective migration of active condensates},\n"
     " journal = {Communications Physics},\n"
     " year =    2026,\n"
